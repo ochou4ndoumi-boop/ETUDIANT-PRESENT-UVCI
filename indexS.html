@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>UVCI Connect - Observatoire de la Présence Universitaire</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --uvci-purple: #7F00FF;
+            --uvci-green: #2ecc71;
+        }
+
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            font-family: 'Segoe UI', sans-serif;
+            background: #fdfdfd;
+        }
+
+        /* HEADER */
+        header {
+            height: 70px;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 40px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 2000;
+        }
+
+        .header-title {
+            color: var(--uvci-purple);
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .header-logo {
+            height: 50px;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR GAUCHE */
+        .sidebar-left {
+            width: 320px;
+            background: white;
+            border-right: 1px solid #eee;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .card h3 {
+            margin: 0 0 10px 0;
+            font-size: 13px;
+            color: var(--uvci-purple);
+            text-transform: uppercase;
+            border-bottom: 1px solid #f0f0f0;
+            padding-bottom: 5px;
+        }
+
+        /* FILTRE NIVEAU */
+        .filter-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            font-size: 12px;
+        }
+
+        /* CARTE & DESIGN */
+        #map {
+            flex: 1;
+            z-index: 1;
+            background: #f0f4f0;
+        }
+
+        .leaflet-tile-container {
+            filter: grayscale(0.2) brightness(1.05) contrast(1.1);
+        }
+
+        /* SIDEBAR DROITE */
+        .sidebar-right {
+            width: 280px;
+            background: white;
+            border-left: 1px solid #eee;
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            /* Aligne le contenu en haut et en bas */
+        }
+
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+
+        .legend-icon {
+            width: 14px;
+            height: 14px;
+            margin-right: 10px;
+            border-radius: 50%;
+        }
+
+        /* POPUP STYLE */
+        .popup-box {
+            width: 220px;
+            text-align: center;
+        }
+
+        .img-round {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid var(--uvci-purple);
+            object-fit: cover;
+            margin: 0 auto 10px;
+            display: block;
+        }
+
+        .popup-info {
+            text-align: left;
+            font-size: 11px;
+            line-height: 1.4;
+            color: #444;
+            border-top: 1px solid #eee;
+            padding-top: 8px;
+        }
+
+        .btn-export {
+            width: 100%;
+            padding: 10px;
+            background: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #555;
+            transition: 0.3s;
+        }
+
+        .btn-export:hover {
+            background: var(--uvci-purple);
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="header-title">UVCI Connect: <span style="font-weight: normal; color: #555;">Observatoire de la
+                Présence Universitaire</span></div>
+        <img src="C:\Users\User\Documents\N'DOUMI OSSOU GUY CYRILLE\PROJET_UVCI\PROJET_UVCI\IdkpP2Gr.png" class="header-logo">
+    </header>
+
+    <div class="main-container">
+        <div class="sidebar-left">
+            <div class="card" style="background: var(--uvci-purple); color: white;">
+                <h3 style="color: white; border-bottom-color: rgba(255,255,255,0.2);">📊 Population</h3>
+                <div style="font-size: 28px; font-weight: bold;" id="total-count">0</div>
+                <div style="font-size: 11px; opacity: 0.8;">Étudiants filtrés</div>
+            </div>
+
+            <div class="card">
+                <h3>🔍 Recherche</h3>
+                <input type="text" id="search" placeholder="Nom ou ville..."
+                    style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px;" onkeyup="filtrer()">
+            </div>
+
+            <div class="card">
+                <h3>🎓 Niveaux d'étude</h3>
+                <div class="filter-grid">
+                    <label><input type="checkbox" class="f-niv" value="Licence 1" onchange="filtrer()"> L1</label>
+                    <label><input type="checkbox" class="f-niv" value="Licence 2" onchange="filtrer()"> L2</label>
+                    <label><input type="checkbox" class="f-niv" value="Licence 3" onchange="filtrer()"> L3</label>
+                    <label><input type="checkbox" class="f-niv" value="Master 1" onchange="filtrer()"> M1</label>
+                    <label><input type="checkbox" class="f-niv" value="Master 2" onchange="filtrer()"> M2</label>
+                    <label><input type="checkbox" class="f-niv" value="Doctorat" onchange="filtrer()"> Doctorat</label>
+                </div>
+                <div class="card">
+                    <h3>🚻 Filtrer par Genre</h3>
+                    <div class="filter-grid">
+                        <label><input type="checkbox" class="f-genre" value="Masculin" onchange="filtrer()">
+                            Hommes</label>
+                        <label><input type="checkbox" class="f-genre" value="Féminin" onchange="filtrer()">
+                            Femmes</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>📊 Statistiques Genre</h3>
+                <canvas id="genreChart" height="150"></canvas>
+                <div id="stat-text" style="font-size: 11px; text-align: center; margin-top: 5px;"></div>
+            </div>
+
+            <button class="btn-export" onclick="exportData()">📥 Exporter vers Excel (CSV)</button>
+        </div>
+
+        <div id="map"></div>
+
+        <div class="sidebar-right">
+            <div>
+                <h3>Légende</h3>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: var(--uvci-green);"></div> Étudiant en vert
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: var(--uvci-purple);"></div> Communauté en violet
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon"
+                        style="background: none; display: flex; align-items: center; justify-content: center;">
+                        <i class="fa-solid fa-graduation-cap" style="color: #444; font-size: 14px;"></i>
+                    </div>
+                    Siège de l'UVCI
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon"
+                        style="border: 2px solid #000; border-radius: 0; background: none; height: 10px;"></div>
+                    Frontière Côte d'Ivoire
+                </div>
+            </div>
+
+            <div
+                style="padding: 15px; background: #fcfaff; border-radius: 8px; font-size: 13px; color: var(--uvci-purple); border-left: 4px solid var(--uvci-purple);">
+                <strong>Passage de Flambeau</strong><br>
+                <small>Promotion L3 - 2026</small>
+                <p style="font-style: italic; margin-top: 5px; font-size: 11px;">"Bâtir ensemble l'excellence
+                    numérique."</p>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var mesDonnees = { "type": "FeatureCollection", "features": [{ "type": "Feature", "id": "donneetudiant.1", "geometry": { "type": "Point", "coordinates": [-4.373856, 5.331807] }, "geometry_name": "wkb_geometry", "properties": { "nom": "N'DRI OHOUSSOU MOÏSE EMMANUEL", "genre": "Masculin", "email": "ohoussou2.ndri@uvci.edu.ci", "niveau": "Licence 3", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/655712371/attachments/attgPZwoZ96jUgCrRMaHZQBn/", "ville": "DABOU", "quartier": "Quartier Rode" } }, { "type": "Feature", "id": "donneetudiant.2", "geometry": { "type": "Point", "coordinates": [-4.102294, 5.326551] }, "geometry_name": "wkb_geometry", "properties": { "nom": "DANO BAHON GRACE LESLIE", "genre": "Féminin", "email": "bahon.dano@uvci.edu.ci", "niveau": "Licence 1", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/655712813/attachments/attH9aWiiMYgpLnJnnnLUE7h/", "ville": "ABIDJAN", "commune": "YOPOUGON", "quartier": "niongon nord lubafrique" } }, { "type": "Feature", "id": "donneetudiant.3", "geometry": { "type": "Point", "coordinates": [-3.567682, 5.293969] }, "geometry_name": "wkb_geometry", "properties": { "nom": "KOUASSI DJEDJE SAMUEL", "genre": "Masculin", "email": "djedje.kouassi@uvci.edu.ci", "niveau": "Licence 1", "specialite": "ISN-RSI", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/655713076/attachments/attfTgvqmqjMvUDje3544yfk/", "ville": "AUTRE", "ville_1": "BONOUA", "quartier": "Céleste" } }, { "type": "Feature", "id": "donneetudiant.4", "geometry": { "type": "Point", "coordinates": [-4.001079, 5.402271] }, "geometry_name": "wkb_geometry", "properties": { "nom": "ADEBAYO MUHAMAD MUJIBU", "genre": "Masculin", "email": "muhamad1.adebayo@uvci.edu.ci", "niveau": "Master 2", "specialite": "ISN-BCD", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/655715620/attachments/attwCKtohFbLY5g4NRQgDwPj/", "ville": "ABIDJAN", "commune": "ABOBO", "quartier": "Abobo Dokoui" } }, { "type": "Feature", "id": "donneetudiant.5", "geometry": { "type": "Point", "coordinates": [-3.930974, 5.365517] }, "geometry_name": "wkb_geometry", "properties": { "nom": "KPAN MANDOH GRACE", "genre": "Féminin", "email": "mandoh1.kpan@uvci.edu.ci", "niveau": "Licence 3", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/655718421/attachments/att2MaQ8rcUXifkRAon2nTLy/", "ville": "ABIDJAN", "commune": "COCODY", "quartier": "Cocody Faya Lauriers 9 D" } }, { "type": "Feature", "id": "donneetudiant.6", "geometry": { "type": "Point", "coordinates": [-3.992917, 5.35457] }, "geometry_name": "wkb_geometry", "properties": { "nom": "KONAN OPHIR", "genre": "Masculin", "email": "retsin.konan@uvci.edu.ci", "niveau": "Licence 1", "specialite": "ISN-RSI", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/655720423/attachments/attHFnHdtYfrf2TfgcxSmask/", "ville": "ABIDJAN", "commune": "COCODY", "quartier": "riviera 2" } }, { "type": "Feature", "id": "donneetudiant.7", "geometry": { "type": "Point", "coordinates": [-4.108775, 5.351654] }, "geometry_name": "wkb_geometry", "properties": { "nom": "DIARRASSOUBA YASMINE MALONE", "genre": "Féminin", "email": "yasmine1.diarrassouba@uvci.edu.ci", "niveau": "Licence 3", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/655730282/attachments/attXst4M2yCQvkYYhSbNMY6d/", "ville": "ABIDJAN", "commune": "YOPOUGON", "quartier": "Yopougon gesco" } }, { "type": "Feature", "id": "donneetudiant.8", "geometry": { "type": "Point", "coordinates": [-4.035188, 5.312635] }, "geometry_name": "wkb_geometry", "properties": { "nom": "YAO ALLOU LOIC EMMANUEL", "genre": "Masculin", "email": "allou.yao@uvci.edu.ci", "niveau": "Licence 3", "specialite": "ISN-DAS", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/655854190/attachments/att5oL5SEBoQRM8Q7EZVwJPk/", "ville": "ABIDJAN", "commune": "COCODY", "quartier": "Angre Mahou" } }, { "type": "Feature", "id": "donneetudiant.9", "geometry": { "type": "Point", "coordinates": [-6.827563, 5.578651] }, "geometry_name": "wkb_geometry", "properties": { "nom": "KOUI GONKAPIEU", "genre": "Masculin", "email": "gonkapieu.koui@uvci.edu.ci", "niveau": "Licence 3", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656047431/attachments/attmuo4dozhhfAcqbivrtpht/", "ville": "SOUBRE", "quartier": "Walebo" } }, { "type": "Feature", "id": "donneetudiant.10", "geometry": { "type": "Point", "coordinates": [-4.008091, 5.434319] }, "geometry_name": "wkb_geometry", "properties": { "nom": "N’DOUMI OCHOU ROXAND KEVINE", "genre": "Masculin", "email": "ochou4.ndoumi@uvci.edu.ci", "niveau": "Licence 3", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656059188/attachments/attDWN9QRQa47WVQSfg64GPz/", "ville": "ABIDJAN", "commune": "ABOBO", "quartier": "Abobo plaque 1" } }, { "type": "Feature", "id": "donneetudiant.11", "geometry": { "type": "Point", "coordinates": [-5.074788, 7.686852] }, "geometry_name": "wkb_geometry", "properties": { "nom": "N'DEDE AKROMAN ALAIN YVANN YOANN", "genre": "Masculin", "email": "akroman.ndede@uvci.edu.ci", "niveau": "Licence 3", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656068370/attachments/attfPdkNic9aKfb6P96uoLB3/", "ville": "ABIDJAN", "commune": "PORT BOUET", "quartier": "Vridi cité" } }, { "type": "Feature", "id": "donneetudiant.12", "geometry": { "type": "Point", "coordinates": [-2.998253, 9.270588] }, "geometry_name": "wkb_geometry", "properties": { "nom": "PALE ERY VALENTINE", "genre": "Féminin", "email": "Ery.pale@uvci.edu.ci", "niveau": "Licence 1", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656073616/attachments/attqeJryenX6vVhDQz2m32g3/", "ville": "BOUNA", "quartier": "Sogephia" } }, { "type": "Feature", "id": "donneetudiant.13", "geometry": { "type": "Point", "coordinates": [-3.996967, 5.382126] }, "geometry_name": "wkb_geometry", "properties": { "nom": "DIABATE GEREMIE", "genre": "Masculin", "email": "jeremie.diabate@uvci.edu.ci", "niveau": "Licence 2", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656116183/attachments/attpSQRfEaPaqVrzjgzdYQ6G/", "ville": "ABIDJAN", "commune": "COCODY", "quartier": "Cocody Aghien" } }, { "type": "Feature", "id": "donneetudiant.14", "geometry": { "type": "Point", "coordinates": [-7.549642, 7.412421] }, "geometry_name": "wkb_geometry", "properties": { "nom": "SAHI MICHEL GUIAGNI", "genre": "Masculin", "email": "sahimichelguiagni@gmail.com", "niveau": "Licence 1", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656117239/attachments/attpQZKLhFfTx3zr3SoZYQwj/", "ville": "MAN", "quartier": "Mangouin yrongouin" } }, { "type": "Feature", "id": "donneetudiant.15", "geometry": { "type": "Point", "coordinates": [-5.727185, 9.89454] }, "geometry_name": "wkb_geometry", "properties": { "nom": "KLA RODRIGUE ARMAND", "genre": "Masculin", "email": "rodrigue.kla@uvci.edu.ci", "niveau": "Licence 2", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656131804/attachments/attFyNoAHjpKxSkVLhuaUYj4/", "ville": "KORHOGO", "quartier": "Tongon" } }, { "type": "Feature", "id": "donneetudiant.16", "geometry": { "type": "Point", "coordinates": [-4.005135, 5.410401] }, "geometry_name": "wkb_geometry", "properties": { "nom": "KOUAO N'DA", "genre": "Masculin", "email": "nda.kouao@uvci.edu.ci", "niveau": "Licence 2", "specialite": "ISN-DAS", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656156494/attachments/attxSQZWknLVCm3m7TKJqrxg/", "ville": "ABIDJAN", "commune": "ABOBO", "quartier": "Abobote" } }, { "type": "Feature", "id": "donneetudiant.17", "geometry": { "type": "Point", "coordinates": [-4.076005, 5.433541] }, "geometry_name": "wkb_geometry", "properties": { "nom": "TANOH DORGELES", "genre": "Masculin", "email": "dorgeles.tanoh@uvci.edu.ci", "niveau": "Licence 1", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656165463/attachments/attjfJA2GbhRyXXSpcvokczL/", "ville": "ABIDJAN", "commune": "ABOBO", "quartier": "N'dotre" } }, { "type": "Feature", "id": "donneetudiant.18", "geometry": { "type": "Point", "coordinates": [-4.085891, 5.454607] }, "geometry_name": "wkb_geometry", "properties": { "nom": "OUATTARA YIGUELEHO", "genre": "Masculin", "email": "yigueleho.ouattara@uvci.edu.ci", "niveau": "Licence 2", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656167744/attachments/attwaLciJ4twt3DB4Ta4Kzp4/", "ville": "ABIDJAN", "commune": "YOPOUGON", "quartier": "Anyama Ébimpé" } }, { "type": "Feature", "id": "donneetudiant.19", "geometry": { "type": "Point", "coordinates": [-4.004175, 5.452795] }, "geometry_name": "wkb_geometry", "properties": { "nom": "NGUESSAN PRISCILLE", "genre": "Féminin", "email": "priscille.nguessan@uvci.edu.ci", "niveau": "Licence 3", "specialite": "ISN-BD", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656405309/attachments/attDz9CcBwyjwkEGLr5qRGGv/", "ville": "ABIDJAN", "commune": "ABOBO", "quartier": "Abobo Djibi" } }, { "type": "Feature", "id": "donneetudiant.20", "geometry": { "type": "Point", "coordinates": [7.3, 4.6] }, "geometry_name": "wkb_geometry", "properties": { "nom": "KONE BASSARA", "genre": "Féminin", "email": "bassara.kone@uvci.edu.ci", "niveau": "Licence 1", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656467168/attachments/attcFsqPvFNWqqMWZkxbbbCy/", "ville": "DALOA", "quartier": "Quartier millionnaire" } }, { "type": "Feature", "id": "donneetudiant.21", "geometry": { "type": "Point", "coordinates": [-4.102294, 5.329486] }, "geometry_name": "wkb_geometry", "properties": { "nom": "KOUAME N'DA YAO PAUL", "genre": "Masculin", "email": "nda8.kouame@uvci.edu.ci", "niveau": "Licence 3", "specialite": "ISN-ATD", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656484355/attachments/attMUPKYybvjdPabzhw7zh9A/", "ville": "ABIDJAN", "commune": "YOPOUGON", "quartier": "Niangon Nord" } }, { "type": "Feature", "id": "donneetudiant.22", "geometry": { "type": "Point", "coordinates": [-7.359087, 6.743352] }, "geometry_name": "wkb_geometry", "properties": { "nom": "KAMBOU SAMI ARNAUD", "genre": "Masculin", "email": "sami1.kambou@uvci.edu.ci", "niveau": "Licence 3", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656520692/attachments/atteD2kNZK3X4RaPPeMegiyp/", "ville": "DUEKOUE", "quartier": "Centrale" } }, { "type": "Feature", "id": "donneetudiant.23", "geometry": { "type": "Point", "coordinates": [-4.011341, 5.444917] }, "geometry_name": "wkb_geometry", "properties": { "nom": "COULIBALY NENOU", "genre": "Masculin", "email": "nenou.coulibaly@uvci.edu.ci", "niveau": "Licence 3", "specialite": "ISN-STG", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/656538945/attachments/attDQ3wEajg5roRGTLf5wMrv/", "ville": "ABIDJAN", "commune": "ABOBO", "quartier": "Abobo Colatier" } }, { "type": "Feature", "id": "donneetudiant.24", "geometry": { "type": "Point", "coordinates": [-4.007478, 5.433647] }, "geometry_name": "wkb_geometry", "properties": { "nom": "ADON ELVIS LEONARD", "genre": "Masculin", "email": "elvis.adon@uvci.edu.ci", "niveau": "Licence 2", "specialite": "ISN-RSI", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/657084371/attachments/attrpYLeKaf6z37AdHBvoRBX/", "ville": "ABIDJAN", "commune": "ABOBO", "quartier": "Abobo plaque 1" } }, { "type": "Feature", "id": "donneetudiant.25", "geometry": { "type": "Point", "coordinates": [-4.014865, 5.406789] }, "geometry_name": "wkb_geometry", "properties": { "nom": "TRAORE ABDUL KADER", "genre": "Masculin", "email": "abdul.traore@uvci.edu.ci", "niveau": "Licence 2", "specialite": "ISN-RSI", "photo_1": "https://kf.kobotoolbox.org/api/v2/assets/a6WVDWu7Ystdpcns2LhJVk/data/657220331/attachments/attzmYAXAmnJssxfbRapnZRs/", "ville": "ABIDJAN", "commune": "ANYAMA", "quartier": "Anyama shineider" } }], "totalFeatures": 25 };
+
+        // INITIALISATION CARTE AVEC FONDS
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+        var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+
+        var map = L.map('map', {
+            zoomControl: true,
+            layers: [osm]
+        }).setView([7.53, -5.54], 7);
+        map.zoomControl.setPosition('topright');
+
+        var baseMaps = { "🌍 Mode Plan": osm, "🛰️ Mode Satellite": satellite };
+        L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+
+        // FRONTIÈRES
+        fetch('https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/pays/cote-divoire.json')
+            .then(r => r.json()).then(data => {
+                L.geoJSON(data, {
+                    style: { color: "#000", weight: 2, opacity: 0.5, fillOpacity: 0 },
+                    interactive: false
+                }).addTo(map);
+            });
+
+        var geojsonLayer, genreChart;
+
+        // LOGOS PETITE TAILLE
+        var iconNorm = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-violet.png',
+            iconSize: [12, 20], iconAnchor: [6, 20], popupAnchor: [1, -15]
+        });
+
+        var iconSel = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+            iconSize: [14, 22], iconAnchor: [7, 22], popupAnchor: [1, -18]
+        });
+
+        function initStats(data) {
+            document.getElementById('total-count').innerText = data.length;
+            var h = data.filter(f => (f.properties.genre || "").toLowerCase().startsWith('m')).length;
+            var f = data.filter(f => (f.properties.genre || "").toLowerCase().startsWith('f')).length;
+            document.getElementById('stat-text').innerHTML = `<b>${h}</b> Hommes | <b>${f}</b> Femmes`;
+
+            if (genreChart) genreChart.destroy();
+            genreChart = new Chart(document.getElementById('genreChart'), {
+                type: 'doughnut',
+                data: { labels: ['H', 'F'], datasets: [{ data: [h, f], backgroundColor: ['#2ecc71', '#7F00FF'], borderWidth: 0 }] },
+                options: { plugins: { legend: { display: false } }, cutout: '75%' }
+            });
+        }
+
+        function afficher(data) {
+            if (geojsonLayer) map.removeLayer(geojsonLayer);
+            initStats(data.features);
+
+            geojsonLayer = L.geoJSON(data, {
+                pointToLayer: function (f, latlng) { return L.marker(latlng, { icon: iconNorm }); },
+                onEachFeature: function (f, layer) {
+                    var p = f.properties;
+                    var photo = p.photo_1 || "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png";
+
+                    var vNom = (p.ville || "").toUpperCase();
+                    var villeTxt = (vNom === "AUTRE") ? (p.ville_1 || "AUTRE") : vNom;
+                    var communeTxt = (vNom === "ABIDJAN") ? `<b>🏠 Commune:</b> ${p.commune || '-'}<br>` : "";
+
+                    var content = `
+                    <div class="popup-box">
+                        <img src="${photo}" class="img-round">
+                        <div style="font-weight:bold; color:var(--uvci-purple);">${p.nom}</div>
+                        <div class="popup-info">
+                            <b>🎓 Niveau:</b> ${p.niveau || '-'}<br>
+                            <b>📚 Spécialité:</b> ${p.specialite || '-'}<br>
+                            <b>📧 Email:</b> <span style="color:var(--uvci-purple)">${p.email || '-'}</span><br>
+                            <b>📍 Ville:</b> ${villeTxt}<br>
+                            ${communeTxt}
+                            <b>🗺️ Quartier:</b> ${p.quartier || '-'}
+                        </div>
+                    </div>`;
+
+                    layer.bindPopup(content, { closeButton: false });
+                    layer.on('mouseover', function () { this.setIcon(iconSel); this.openPopup(); });
+                    layer.on('mouseout', function () { this.setIcon(iconNorm); this.closePopup(); });
+                }
+            }).addTo(map);
+        }
+
+        function filtrer() {
+            var txt = document.getElementById('search').value.toLowerCase();
+            var nivs = Array.from(document.querySelectorAll('.f-niv:checked')).map(cb => cb.value);
+            var genres = Array.from(document.querySelectorAll('.f-genre:checked')).map(cb => cb.value);
+
+            var filtered = mesDonnees.features.filter(f => {
+                var mTxt = (f.properties.nom + (f.properties.ville || "")).toLowerCase().includes(txt);
+                var mNiv = nivs.length === 0 || nivs.includes(f.properties.niveau);
+                var mGen = genres.length === 0 || genres.includes(f.properties.genre);
+
+                return mTxt && mNiv && mGen;
+            });
+
+            afficher({ type: "FeatureCollection", features: filtered });
+        }
+
+        function exportData() {
+            let rows = [["Nom", "Genre", "Niveau", "Ville", "Specialite"]];
+            geojsonLayer.eachLayer(layer => {
+                let p = layer.feature.properties;
+                rows.push([p.nom, p.genre, p.niveau, p.ville, p.specialite]);
+            });
+            let csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+            let link = document.createElement("a");
+            link.setAttribute("href", encodeURI(csvContent));
+            link.setAttribute("download", "observatoire_uvci_export.csv");
+            document.body.appendChild(link);
+            link.click();
+        }
+
+        if (mesDonnees) afficher(mesDonnees);
+    </script>
+</body>
+
+</html>
